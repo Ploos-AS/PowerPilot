@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { classifyPrice, DEFAULT_THRESHOLDS, type PriceArea, type Thresholds } from "./domain";
 import { usePrices } from "./usePrices";
+import { cheapestWindows } from "./priceWindows";
 import "./style.css";
 
 const AREAS: PriceArea[] = ["NO1", "NO2", "NO3", "NO4", "NO5"];
@@ -32,6 +33,7 @@ export default function App() {
   };
 
   const signal = classifyPrice(current.orePerKwh, thresholds);
+  const windows = cheapestWindows(prices);
 
   return <main>
     <header>
@@ -62,6 +64,19 @@ export default function App() {
         onChange={e => update({ ...thresholds, favourableBelow: Number(e.target.value) })}/> øre/kWh</label>
       <label>Expensive above <input type="number" value={thresholds.expensiveAbove}
         onChange={e => update({ ...thresholds, expensiveAbove: Number(e.target.value) })}/> øre/kWh</label>
+    </section>
+
+    <section>
+      <h2>Cheapest continuous windows</h2>
+      <div className="windows">{windows.map(window => {
+        const start = new Date(window.startsAt);
+        const end = new Date(window.endsAt);
+        return <article key={window.hours}>
+          <strong>{window.hours}h</strong>
+          <span>{start.toLocaleDateString(undefined, { weekday: "short" })} {start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}–{end.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
+          <b>{window.averageOrePerKwh.toFixed(1)} øre/kWh avg.</b>
+        </article>;
+      })}</div>
     </section>
 
     <section>
