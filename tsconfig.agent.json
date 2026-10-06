@@ -10,5 +10,6 @@
     "isolatedModules": false,
     "types": ["node"]
   },
-  "include": ["src/agent/**/*.ts"]
+  "include": ["src/agent/**/*.ts"],
+  "exclude": ["src/agent/**/*.test.ts"]
 }
