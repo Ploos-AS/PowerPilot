@@ -15,7 +15,11 @@ export async function deliverAgentWebhook(
 ): Promise<void> {
   const response = await fetcher(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "idempotency-key": event.id,
+      "x-powerpilot-event-id": event.id,
+    },
     body: JSON.stringify(event),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
