@@ -60,6 +60,32 @@ describe("smart scheduler", () => {
     });
   });
 
+  it("returns run-now when the job has reached its last feasible start", () => {
+    const result = scheduleJob(
+      job({
+        durationMinutes: 120,
+        earliestStart: "2026-10-07T02:00:00.000Z",
+        deadline: "2026-10-07T06:00:00.000Z",
+      }),
+      prices([90, 90, 40, 30, 20, 10]),
+      new Date("2026-10-07T04:00:00.000Z"),
+    );
+    expect(result.status).toBe("run-now");
+    if (result.status === "run-now") {
+      expect(result.startsAt).toBe("2026-10-07T04:00:00.000Z");
+      expect(result.endsAt).toBe("2026-10-07T06:00:00.000Z");
+    }
+  });
+
+  it("keeps a cheaper future window scheduled before the last feasible start", () => {
+    const result = scheduleJob(
+      job(),
+      prices([80, 70, 50, 40, 20, 10]),
+      new Date("2026-10-07T01:00:00.000Z"),
+    );
+    expect(result.status).toBe("scheduled");
+  });
+
   it("rejects sub-hour jobs until interval-aware scheduling lands", () => {
     expect(scheduleJob(job({ durationMinutes: 90 }), prices([10, 20, 30]))).toMatchObject({
       status: "unschedulable",
