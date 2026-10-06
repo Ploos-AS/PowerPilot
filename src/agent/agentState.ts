@@ -17,6 +17,21 @@ export type PersistedSavingsRecord = {
   comparableJobs: number;
 };
 
+export type OutboxEvent = {
+  id: string;
+  kind: "automation";
+  payload: {
+    schema: "powerpilot.automation.v1";
+    id: string;
+    area: string;
+    startsAt: string;
+    orePerKwh: number;
+    signal: "negative" | "favourable" | "normal" | "expensive";
+    policy: "ALLOW_LOW_PRIORITY_COMPUTE" | "NORMAL" | "CURTAIL_LOW_PRIORITY_COMPUTE";
+  };
+  createdAt: string;
+};
+
 export const AGENT_STATE_SCHEMA = "powerpilot.agent-state.v1" as const;
 
 export type DeliveryState = {
@@ -33,6 +48,7 @@ export type AgentState = {
   jobs: PersistedJob[];
   savings: PersistedSavingsRecord[];
   deliveries: DeliveryState[];
+  outbox: OutboxEvent[];
 };
 
 export function emptyAgentState(): AgentState {
@@ -41,6 +57,7 @@ export function emptyAgentState(): AgentState {
     jobs: [],
     savings: [],
     deliveries: [],
+    outbox: [],
   };
 }
 
@@ -51,4 +68,6 @@ export function assertAgentState(value: unknown): asserts value is AgentState {
   if (!Array.isArray(state.jobs) || !Array.isArray(state.savings) || !Array.isArray(state.deliveries)) {
     throw new Error("Invalid Agent state collections");
   }
+  if (state.outbox === undefined) state.outbox = [];
+  if (!Array.isArray(state.outbox)) throw new Error("Invalid Agent outbox");
 }
