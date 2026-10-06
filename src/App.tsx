@@ -7,7 +7,7 @@ import { DEFAULT_AUTOMATION_SETTINGS, loadAutomationSettings, saveAutomationSett
 import { createAutomationEvent } from "./automation";
 import { dispatchAutomation } from "./automationDispatcher";
 import { aggregateSavings } from "./savingsHistory";
-import { SavingsHistoryRepository } from "./savingsStorage";
+import { exportSavingsHistory, importSavingsHistory, SavingsHistoryRepository } from "./savingsStorage";
 import "./style.css";
 
 type SavingsPeriod = "today" | "week" | "month" | "all";
@@ -42,7 +42,7 @@ export default function App() {
   const [notificationStatus, setNotificationStatus] = useState<string>("Notifications off");
   const [automation, setAutomation] = useState<AutomationSettings>(loadAutomationSettings);
   const [savingsPeriod, setSavingsPeriod] = useState<SavingsPeriod>("month");
-  const [savingsRecords] = useState(() => {
+  const [savingsRecords, setSavingsRecords] = useState(() => {
     try { return new SavingsHistoryRepository(localStorage).load(); } catch { return []; }
   });
   const loadState = usePrices(area);
@@ -74,6 +74,27 @@ export default function App() {
   const updateAutomation = (next: AutomationSettings) => {
     setAutomation(next);
     saveAutomationSettings(next);
+  };
+
+  const exportSavings = () => {
+    const blob = new Blob([exportSavingsHistory(savingsRecords)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "powerpilot-savings.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importSavings = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const records = importSavingsHistory(await file.text());
+      new SavingsHistoryRepository(localStorage).save(records);
+      setSavingsRecords(records);
+    } catch {
+      window.alert("PowerPilot could not import this savings history file.");
+    }
   };
 
   const enableNotifications = async () => {
