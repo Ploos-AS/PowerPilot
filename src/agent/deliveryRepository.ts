@@ -9,9 +9,11 @@ export class DeliveryRepository {
     private readonly repository: AgentStateRepository,
   ) {}
 
-  listPending(): DeliveryState[] {
+  listPending(now = new Date()): DeliveryState[] {
+    const nowMs = now.getTime();
     return this.state.deliveries
-      .filter(item => item.status === "pending")
+      .filter(item => item.status === "pending" && (!item.nextAttemptAt || Date.parse(item.nextAttemptAt) <= nowMs))
+      .sort((a, b) => a.eventId.localeCompare(b.eventId) || a.transport.localeCompare(b.transport))
       .map(item => ({ ...item }));
   }
 
@@ -46,17 +48,23 @@ export class DeliveryRepository {
       attempts: item.attempts + 1,
       updatedAt: now.toISOString(),
       lastError: undefined,
+      nextAttemptAt: undefined,
     }));
   }
 
   async recordFailure(eventId: string, transport: DeliveryTransport, error: string, now = new Date()): Promise<void> {
-    await this.update(eventId, transport, item => ({
-      ...item,
-      status: "pending",
-      attempts: item.attempts + 1,
-      updatedAt: now.toISOString(),
-      lastError: error,
-    }));
+    await this.update(eventId, transport, item => {
+      const attempts = item.attempts + 1;
+      const delayMs = Math.min(300_000, 5_000 * 2 ** Math.min(attempts - 1, 16));
+      return {
+        ...item,
+        status: "pending",
+        attempts,
+        updatedAt: now.toISOString(),
+        lastError: error,
+        nextAttemptAt: new Date(now.getTime() + delayMs).toISOString(),
+      };
+    });
   }
 
   private async update(
