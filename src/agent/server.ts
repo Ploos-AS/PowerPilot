@@ -1,10 +1,15 @@
 import { createServer, type Server } from "node:http";
 import type { AgentConfig } from "./config.js";
 
-export function createAgentServer(config: AgentConfig): Server {
-  let ready = false;
+export type AgentReadiness = {
+  isReady(): boolean;
+};
 
-  const server = createServer((request, response) => {
+export function createAgentServer(
+  config: AgentConfig,
+  readiness: AgentReadiness = { isReady: () => false },
+): Server {
+  return createServer((request, response) => {
     if (request.method === "GET" && request.url === "/healthz") {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ status: "ok" }));
@@ -12,6 +17,7 @@ export function createAgentServer(config: AgentConfig): Server {
     }
 
     if (request.method === "GET" && request.url === "/readyz") {
+      const ready = readiness.isReady();
       response.writeHead(ready ? 200 : 503, { "content-type": "application/json" });
       response.end(JSON.stringify({ status: ready ? "ready" : "starting" }));
       return;
@@ -20,15 +26,6 @@ export function createAgentServer(config: AgentConfig): Server {
     response.writeHead(404, { "content-type": "application/json" });
     response.end(JSON.stringify({ error: "not_found" }));
   });
-
-  server.on("listening", () => {
-    ready = true;
-  });
-  server.on("close", () => {
-    ready = false;
-  });
-
-  return server;
 }
 
 export function listenAgent(server: Server, config: AgentConfig): Promise<void> {
