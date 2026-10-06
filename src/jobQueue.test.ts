@@ -1,0 +1,57 @@
+import { describe, expect, it } from "vitest";
+import type { HourlyPrice } from "./domain";
+import { planJobQueue } from "./jobQueue";
+import type { FlexibleJob } from "./scheduler";
+
+const prices: HourlyPrice[] = [80, 10, 20, 90].map((orePerKwh, hour) => ({
+  area: "NO2",
+  startsAt: `2026-10-07T0${hour}:00:00.000Z`,
+  orePerKwh,
+}));
+
+const makeJob = (id: string, priority: FlexibleJob["priority"]): FlexibleJob => ({
+  id,
+  durationMinutes: 60,
+  earliestStart: "2026-10-07T00:00:00.000Z",
+  deadline: "2026-10-07T04:00:00.000Z",
+  priority,
+});
+
+describe("job queue planner", () => {
+  it("gives the cheapest slot to the higher-priority job at capacity one", () => {
+    const plan = planJobQueue(
+      [makeJob("low", "low"), makeJob("high", "high")],
+      prices,
+      1,
+      new Date("2026-10-07T00:00:00.000Z"),
+    );
+    expect(plan.decisions.map(d => d.jobId)).toEqual(["high", "low"]);
+    expect(plan.decisions[0].status === "scheduled" && plan.decisions[0].startsAt)
+      .toBe("2026-10-07T01:00:00.000Z");
+    expect(plan.decisions[1].status === "scheduled" && plan.decisions[1].startsAt)
+      .toBe("2026-10-07T02:00:00.000Z");
+  });
+
+  it("allows jobs to share a slot when capacity permits", () => {
+    const plan = planJobQueue(
+      [makeJob("a", "low"), makeJob("b", "low")],
+      prices,
+      2,
+      new Date("2026-10-07T00:00:00.000Z"),
+    );
+    expect(plan.decisions.every(d => d.status === "scheduled")).toBe(true);
+    expect(plan.decisions.map(d => d.status === "scheduled" ? d.startsAt : null))
+      .toEqual(["2026-10-07T01:00:00.000Z", "2026-10-07T01:00:00.000Z"]);
+  });
+
+  it("uses earlier deadline before job id at equal priority", () => {
+    const later = { ...makeJob("a", "normal"), deadline: "2026-10-07T04:00:00.000Z" };
+    const earlier = { ...makeJob("z", "normal"), deadline: "2026-10-07T03:00:00.000Z" };
+    const plan = planJobQueue([later, earlier], prices, 1, new Date("2026-10-07T00:00:00.000Z"));
+    expect(plan.decisions[0].jobId).toBe("z");
+  });
+
+  it("rejects invalid queue capacity", () => {
+    expect(() => planJobQueue([], prices, 0)).toThrow("maxConcurrentJobs");
+  });
+});
