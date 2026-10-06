@@ -1,5 +1,21 @@
-import type { FlexibleJob } from "../scheduler.js";
-import type { SavingsRecord } from "../savingsHistory.js";
+export type PersistedJob = {
+  id: string;
+  durationMinutes: number;
+  earliestStart: string;
+  deadline: string;
+  priority: "low" | "normal" | "high";
+  pool?: string;
+  estimatedPowerWatts?: number;
+};
+
+export type PersistedSavingsRecord = {
+  recordedAt: string;
+  scheduledSpotCostNok: number;
+  immediateSpotCostNok: number;
+  savingsNok: number;
+  energyKwh: number;
+  comparableJobs: number;
+};
 
 export const AGENT_STATE_SCHEMA = "powerpilot.agent-state.v1" as const;
 
@@ -14,8 +30,8 @@ export type DeliveryState = {
 
 export type AgentState = {
   schema: typeof AGENT_STATE_SCHEMA;
-  jobs: FlexibleJob[];
-  savings: SavingsRecord[];
+  jobs: PersistedJob[];
+  savings: PersistedSavingsRecord[];
   deliveries: DeliveryState[];
 };
 
