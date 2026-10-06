@@ -2,6 +2,10 @@ export type AgentConfig = {
   host: string;
   port: number;
   statePath: string;
+  mqttUrl?: string;
+  mqttUsername?: string;
+  mqttPassword?: string;
+  webhookUrl?: string;
 };
 
 export function loadAgentConfig(
@@ -16,6 +20,14 @@ export function loadAgentConfig(
   }
 
   const statePath = env.POWERPILOT_AGENT_STATE_PATH?.trim() || "./data/agent-state.json";
+  const mqttUrl = env.POWERPILOT_MQTT_URL?.trim() || undefined;
+  const mqttUsername = env.POWERPILOT_MQTT_USERNAME?.trim() || undefined;
+  const mqttPassword = env.POWERPILOT_MQTT_PASSWORD || undefined;
+  const webhookUrl = env.POWERPILOT_WEBHOOK_URL?.trim() || undefined;
 
-  return { host, port, statePath };
+  if ((mqttUsername || mqttPassword) && !mqttUrl) {
+    throw new Error("POWERPILOT_MQTT_URL is required when MQTT credentials are configured");
+  }
+
+  return { host, port, statePath, mqttUrl, mqttUsername, mqttPassword, webhookUrl };
 }
