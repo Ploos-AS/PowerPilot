@@ -6,7 +6,24 @@ import { notifyPrice, requestNotificationPermission } from "./notifications";
 import { DEFAULT_AUTOMATION_SETTINGS, loadAutomationSettings, saveAutomationSettings, type AutomationSettings } from "./automationSettings";
 import { createAutomationEvent } from "./automation";
 import { dispatchAutomation } from "./automationDispatcher";
+import { aggregateSavings } from "./savingsHistory";
+import { SavingsHistoryRepository } from "./savingsStorage";
 import "./style.css";
+
+type SavingsPeriod = "today" | "week" | "month" | "all";
+
+function savingsRange(period: SavingsPeriod, now = new Date()): [string | undefined, string | undefined] {
+  if (period === "all") return [undefined, undefined];
+  const from = new Date(now);
+  from.setHours(0, 0, 0, 0);
+  if (period === "week") {
+    const mondayOffset = (from.getDay() + 6) % 7;
+    from.setDate(from.getDate() - mondayOffset);
+  } else if (period === "month") {
+    from.setDate(1);
+  }
+  return [from.toISOString(), undefined];
+}
 
 const AREAS: PriceArea[] = ["NO1", "NO2", "NO3", "NO4", "NO5"];
 
@@ -24,6 +41,10 @@ export default function App() {
   const [thresholds, setThresholds] = useState<Thresholds>(load);
   const [notificationStatus, setNotificationStatus] = useState<string>("Notifications off");
   const [automation, setAutomation] = useState<AutomationSettings>(loadAutomationSettings);
+  const [savingsPeriod, setSavingsPeriod] = useState<SavingsPeriod>("month");
+  const [savingsRecords] = useState(() => {
+    try { return new SavingsHistoryRepository(localStorage).load(); } catch { return []; }
+  });
   const loadState = usePrices(area);
   const prices = loadState.prices;
   const now = Date.now();
@@ -40,6 +61,8 @@ export default function App() {
 
   const signal = classifyPrice(current.orePerKwh, thresholds);
   const windows = cheapestWindows(prices);
+  const [savingsFrom, savingsTo] = savingsRange(savingsPeriod);
+  const savings = aggregateSavings(savingsRecords, savingsFrom, savingsTo);
 
   useEffect(() => {
     if (loadState.source !== "live") return;
