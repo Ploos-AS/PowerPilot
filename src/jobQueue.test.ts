@@ -89,6 +89,30 @@ describe("job queue planner", () => {
     expect(() => planJobQueue([], prices, 1, new Date(), 0)).toThrow("maxPowerWatts");
   });
 
+  it("enforces independent resource pool capacities", () => {
+    const renderA = { ...makeJob("render-a", "normal"), pool: "render", estimatedPowerWatts: 1200 };
+    const renderB = { ...makeJob("render-b", "normal"), pool: "render", estimatedPowerWatts: 1200 };
+    const ci = { ...makeJob("ci", "normal"), pool: "ci", estimatedPowerWatts: 400 };
+    const plan = planJobQueue(
+      [renderA, renderB, ci],
+      prices,
+      4,
+      new Date("2026-10-07T00:00:00.000Z"),
+      4000,
+      {
+        render: { maxConcurrentJobs: 1, maxPowerWatts: 2500 },
+        ci: { maxConcurrentJobs: 3, maxPowerWatts: 600 },
+      },
+    );
+    const starts = Object.fromEntries(plan.decisions.map(d => [
+      d.jobId,
+      d.status === "scheduled" ? d.startsAt : d.status,
+    ]));
+    expect(starts["render-a"]).toBe("2026-10-07T01:00:00.000Z");
+    expect(starts["render-b"]).toBe("2026-10-07T02:00:00.000Z");
+    expect(starts.ci).toBe("2026-10-07T01:00:00.000Z");
+  });
+
   it("rejects invalid queue capacity", () => {
     expect(() => planJobQueue([], prices, 0)).toThrow("maxConcurrentJobs");
   });
