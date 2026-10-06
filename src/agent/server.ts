@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import type { AgentConfig } from "./config";
+import type { AgentConfig } from "./config.js";
 
 export function createAgentServer(config: AgentConfig): Server {
   let ready = false;
