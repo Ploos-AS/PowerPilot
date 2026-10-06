@@ -49,9 +49,9 @@ describe("DeliveryEngine", () => {
     });
     expect(outbox.get(event.id)).toEqual(event);
     expect(deliveries.get(event.id, "mqtt")).toMatchObject({ status: "delivered", attempts: 1 });
-    expect(deliveries.get(event.id, "webhook")).toMatchObject({ status: "pending", attempts: 1 });
+    expect(deliveries.get(event.id, "webhook")).toMatchObject({ status: "pending", attempts: 1, nextAttemptAt: "2026-10-06T18:01:05.000Z" });
 
-    await expect(engine.runOnce(new Date("2026-10-06T18:02:00Z"))).resolves.toEqual({
+    await expect(engine.runOnce(new Date("2026-10-06T18:01:05Z"))).resolves.toEqual({
       delivered: 1, failed: 0, skipped: 0,
     });
     expect(mqtt).toHaveBeenCalledTimes(1);
