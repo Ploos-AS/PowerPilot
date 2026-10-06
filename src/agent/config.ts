@@ -1,6 +1,7 @@
 export type AgentConfig = {
   host: string;
   port: number;
+  statePath: string;
 };
 
 export function loadAgentConfig(
@@ -14,5 +15,7 @@ export function loadAgentConfig(
     throw new Error("POWERPILOT_AGENT_PORT must be an integer from 1 to 65535");
   }
 
-  return { host, port };
+  const statePath = env.POWERPILOT_AGENT_STATE_PATH?.trim() || "./data/agent-state.json";
+
+  return { host, port, statePath };
 }
