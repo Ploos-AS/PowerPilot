@@ -6,15 +6,27 @@ import { loadStateOrClose } from "./startup.js";
 import { AgentJobRepository } from "./jobRepository.js";
 import { createDeliveryEngine } from "./deliveryRuntime.js";
 import { AgentWorker } from "./worker.js";
+import { OutboxRepository } from "./outboxRepository.js";
+import type { DeliveryTransport } from "./deliveryRepository.js";
 
 const config = loadAgentConfig();
 let ready = false;
 let jobs: AgentJobRepository | undefined;
-const server = createAgentServer(config, { isReady: () => ready }, { get jobs() { return jobs; } });
+let outbox: OutboxRepository | undefined;
+const automationTransports: DeliveryTransport[] = [
+  ...(config.mqttUrl ? ["mqtt" as const] : []),
+  ...(config.webhookUrl ? ["webhook" as const] : []),
+];
+const server = createAgentServer(config, { isReady: () => ready }, {
+  get jobs() { return jobs; },
+  get outbox() { return outbox; },
+  automationTransports,
+});
 const stateRepository = new AgentStateRepository(new JsonFileStateStore(config.statePath));
 await listenAgent(server, config);
 const state = await loadStateOrClose(server, stateRepository);
 jobs = new AgentJobRepository(state, stateRepository);
+outbox = new OutboxRepository(state, stateRepository);
 
 const deliveryEngine = createDeliveryEngine(config, state, stateRepository);
 const worker = new AgentWorker(async () => {
