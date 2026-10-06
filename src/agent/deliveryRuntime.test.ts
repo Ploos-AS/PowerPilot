@@ -48,16 +48,27 @@ describe("delivery runtime restart", () => {
         },
       }, ["webhook"]);
 
-      await expect(createDeliveryEngine(config, state1, repository1).runOnce()).resolves.toMatchObject({
+      const firstAttemptAt = new Date("2026-10-06T20:00:00.000Z");
+      await expect(createDeliveryEngine(config, state1, repository1).runOnce(firstAttemptAt)).resolves.toMatchObject({
         delivered: 0, failed: 1,
       });
 
       const repository2 = new AgentStateRepository(new JsonFileStateStore(statePath));
       const state2 = await repository2.load();
       expect(state2.outbox).toHaveLength(1);
-      expect(state2.deliveries[0]).toMatchObject({ status: "pending", attempts: 1 });
+      expect(state2.deliveries[0]).toMatchObject({
+        status: "pending",
+        attempts: 1,
+        nextAttemptAt: "2026-10-06T20:00:05.000Z",
+      });
 
-      await expect(createDeliveryEngine(config, state2, repository2).runOnce()).resolves.toMatchObject({
+      const restartedEngine = createDeliveryEngine(config, state2, repository2);
+      await expect(restartedEngine.runOnce(new Date("2026-10-06T20:00:04.999Z"))).resolves.toMatchObject({
+        delivered: 0, failed: 0,
+      });
+      expect(requests).toBe(1);
+
+      await expect(restartedEngine.runOnce(new Date("2026-10-06T20:00:05.000Z"))).resolves.toMatchObject({
         delivered: 1, failed: 0,
       });
 
