@@ -55,12 +55,12 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
 
   const hours = job.durationMinutes / 60;
   const preferredDeadline = deadline - priorityBufferMs(job.priority);
-  const effectiveDeadline = preferredDeadline > earliest ? preferredDeadline : deadline;
   const sorted = [...prices].sort(
     (a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt),
   );
 
   let best: Extract<ScheduleDecision, { status: "scheduled" | "run-now" }> | null = null;
+  let bestFallback: Extract<ScheduleDecision, { status: "scheduled" | "run-now" }> | null = null;
   let eligibleStarts = 0;
 
   for (let i = 0; i <= sorted.length - hours; i++) {
@@ -68,7 +68,7 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
     const start = Date.parse(slice[0].startsAt);
     const end = start + job.durationMinutes * 60_000;
 
-    if (start < earliest || end > effectiveDeadline) continue;
+    if (start < earliest || end > deadline) continue;
     eligibleStarts++;
 
     const contiguous = slice.every(
@@ -77,14 +77,13 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
     if (!contiguous) continue;
 
     const average = slice.reduce((sum, price) => sum + price.orePerKwh, 0) / hours;
-    if (best === null || average < best.averageOrePerKwh) {
-      const estimatedEnergyKwh = job.estimatedPowerWatts === undefined
+    const estimatedEnergyKwh = job.estimatedPowerWatts === undefined
         ? undefined
         : (job.estimatedPowerWatts / 1000) * (job.durationMinutes / 60);
       const estimatedSpotCostNok = estimatedEnergyKwh === undefined
         ? undefined
         : estimatedEnergyKwh * (average / 100);
-      best = {
+    const candidate: Extract<ScheduleDecision, { status: "scheduled" | "run-now" }> = {
         status: "scheduled",
         jobId: job.id,
         startsAt: slice[0].startsAt,
@@ -93,11 +92,13 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
         prices: slice,
         ...(estimatedEnergyKwh === undefined ? {} : { estimatedEnergyKwh, estimatedSpotCostNok }),
       };
-    }
+    if (bestFallback === null || average < bestFallback.averageOrePerKwh) bestFallback = candidate;
+    if (end <= preferredDeadline && (best === null || average < best.averageOrePerKwh)) best = candidate;
   }
 
+  best ??= bestFallback;
   if (best) {
-    const latestStart = effectiveDeadline - job.durationMinutes * 60_000;
+    const latestStart = deadline - job.durationMinutes * 60_000;
     const nowMs = now.getTime();
     if (nowMs >= latestStart && Date.parse(best.startsAt) <= nowMs) {
       return { ...best, status: "run-now" };
