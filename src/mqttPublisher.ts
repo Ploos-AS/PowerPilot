@@ -4,14 +4,6 @@ import { mqttPublications, type MqttPublication } from "./mqtt";
 
 export type MqttPublishResult =
   | { ok: true; published: number }
-
-export async function publishMqtt(
-  url: string,
-  event: AutomationEvent,
-  connect: (url: string) => MqttLikeClient = mqtt.connect as unknown as (url: string) => MqttLikeClient,
-): Promise<MqttPublishResult> {
-  return publishMqttPublications(url, mqttPublications(event), connect);
-}
   | { ok: false; error: string };
 
 export type MqttLikeClient = {
@@ -44,4 +36,12 @@ export async function publishMqttPublications(
   } finally {
     client.end();
   }
+}
+
+export async function publishMqtt(
+  url: string,
+  event: AutomationEvent,
+  connect: (url: string) => MqttLikeClient = mqtt.connect as unknown as (url: string) => MqttLikeClient,
+): Promise<MqttPublishResult> {
+  return publishMqttPublications(url, mqttPublications(event), connect);
 }
