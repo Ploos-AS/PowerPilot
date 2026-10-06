@@ -8,6 +8,7 @@ export type FlexibleJob = {
   earliestStart: string;
   deadline: string;
   priority: JobPriority;
+  pool?: string;
   estimatedPowerWatts?: number;
 };
 
