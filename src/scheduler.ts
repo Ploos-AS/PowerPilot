@@ -27,6 +27,12 @@ export type ScheduleDecision =
 
 const HOUR_MS = 60 * 60 * 1000;
 
+export function priorityBufferMs(priority: JobPriority): number {
+  if (priority === "high") return 2 * HOUR_MS;
+  if (priority === "normal") return HOUR_MS;
+  return 0;
+}
+
 export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new Date()): ScheduleDecision {
   const earliest = Date.parse(job.earliestStart);
   const deadline = Date.parse(job.deadline);
@@ -44,6 +50,8 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
   }
 
   const hours = job.durationMinutes / 60;
+  const preferredDeadline = deadline - priorityBufferMs(job.priority);
+  const effectiveDeadline = preferredDeadline > earliest ? preferredDeadline : deadline;
   const sorted = [...prices].sort(
     (a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt),
   );
@@ -56,7 +64,7 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
     const start = Date.parse(slice[0].startsAt);
     const end = start + job.durationMinutes * 60_000;
 
-    if (start < earliest || end > deadline) continue;
+    if (start < earliest || end > effectiveDeadline) continue;
     eligibleStarts++;
 
     const contiguous = slice.every(
@@ -78,7 +86,7 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
   }
 
   if (best) {
-    const latestStart = deadline - job.durationMinutes * 60_000;
+    const latestStart = effectiveDeadline - job.durationMinutes * 60_000;
     const nowMs = now.getTime();
     if (nowMs >= latestStart && Date.parse(best.startsAt) <= nowMs) {
       return { ...best, status: "run-now" };
