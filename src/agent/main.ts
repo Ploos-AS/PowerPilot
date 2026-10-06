@@ -19,12 +19,10 @@ const shutdown = (signal: string) => {
       process.exitCode = 1;
       return;
     }
-    try {
-      await stateRepository.save(state);
-    } catch (saveError) {
+    void stateRepository.save(state).catch(saveError => {
       console.error(saveError);
       process.exitCode = 1;
-    }
+    });
   });
 };
 
