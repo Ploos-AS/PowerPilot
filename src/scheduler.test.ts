@@ -109,6 +109,35 @@ describe("smart scheduler", () => {
     expect(high.status === "scheduled" && high.startsAt).toBe("2026-10-07T02:00:00.000Z");
   });
 
+  it("estimates energy and spot cost when power is known", () => {
+    const result = scheduleJob(job({
+      durationMinutes: 120,
+      priority: "low",
+      estimatedPowerWatts: 500,
+    }), prices([80, 70, 20, 10, 60, 90]), new Date("2026-10-07T00:00:00.000Z"));
+    expect(result.status).toBe("scheduled");
+    if (result.status === "scheduled") {
+      expect(result.estimatedEnergyKwh).toBe(1);
+      expect(result.estimatedSpotCostNok).toBeCloseTo(0.15);
+    }
+  });
+
+  it("keeps cost optional when workload power is unknown", () => {
+    const result = scheduleJob(job({ priority: "low" }), prices([20, 10, 50]));
+    expect(result.status).toBe("scheduled");
+    if (result.status === "scheduled") {
+      expect(result.estimatedEnergyKwh).toBeUndefined();
+      expect(result.estimatedSpotCostNok).toBeUndefined();
+    }
+  });
+
+  it("rejects invalid estimated power", () => {
+    expect(scheduleJob(job({ estimatedPowerWatts: 0 }), prices([10, 20, 30]))).toMatchObject({
+      status: "unschedulable",
+      reason: "invalid-job",
+    });
+  });
+
   it("rejects sub-hour jobs until interval-aware scheduling lands", () => {
     expect(scheduleJob(job({ durationMinutes: 90 }), prices([10, 20, 30]))).toMatchObject({
       status: "unschedulable",
