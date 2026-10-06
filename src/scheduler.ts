@@ -8,6 +8,7 @@ export type FlexibleJob = {
   earliestStart: string;
   deadline: string;
   priority: JobPriority;
+  estimatedPowerWatts?: number;
 };
 
 export type ScheduleDecision =
@@ -18,6 +19,8 @@ export type ScheduleDecision =
       endsAt: string;
       averageOrePerKwh: number;
       prices: HourlyPrice[];
+      estimatedEnergyKwh?: number;
+      estimatedSpotCostNok?: number;
     }
   | {
       status: "unschedulable";
@@ -44,6 +47,7 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
     job.durationMinutes % 60 !== 0 ||
     !Number.isFinite(earliest) ||
     !Number.isFinite(deadline) ||
+    (job.estimatedPowerWatts !== undefined && (!Number.isFinite(job.estimatedPowerWatts) || job.estimatedPowerWatts <= 0)) ||
     earliest >= deadline
   ) {
     return { status: "unschedulable", jobId: job.id, reason: "invalid-job" };
@@ -74,6 +78,12 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
 
     const average = slice.reduce((sum, price) => sum + price.orePerKwh, 0) / hours;
     if (best === null || average < best.averageOrePerKwh) {
+      const estimatedEnergyKwh = job.estimatedPowerWatts === undefined
+        ? undefined
+        : (job.estimatedPowerWatts / 1000) * (job.durationMinutes / 60);
+      const estimatedSpotCostNok = estimatedEnergyKwh === undefined
+        ? undefined
+        : estimatedEnergyKwh * (average / 100);
       best = {
         status: "scheduled",
         jobId: job.id,
@@ -81,6 +91,7 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
         endsAt: new Date(end).toISOString(),
         averageOrePerKwh: average,
         prices: slice,
+        ...(estimatedEnergyKwh === undefined ? {} : { estimatedEnergyKwh, estimatedSpotCostNok }),
       };
     }
   }
