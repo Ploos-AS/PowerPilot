@@ -6,6 +6,7 @@ export type AgentConfig = {
   mqttUsername?: string;
   mqttPassword?: string;
   webhookUrl?: string;
+  workerIntervalMs: number;
 };
 
 export function loadAgentConfig(
@@ -24,10 +25,14 @@ export function loadAgentConfig(
   const mqttUsername = env.POWERPILOT_MQTT_USERNAME?.trim() || undefined;
   const mqttPassword = env.POWERPILOT_MQTT_PASSWORD || undefined;
   const webhookUrl = env.POWERPILOT_WEBHOOK_URL?.trim() || undefined;
+  const workerIntervalMs = Number(env.POWERPILOT_WORKER_INTERVAL_MS?.trim() || "5000");
+  if (!Number.isInteger(workerIntervalMs) || workerIntervalMs < 1000) {
+    throw new Error("POWERPILOT_WORKER_INTERVAL_MS must be an integer of at least 1000");
+  }
 
   if ((mqttUsername || mqttPassword) && !mqttUrl) {
     throw new Error("POWERPILOT_MQTT_URL is required when MQTT credentials are configured");
   }
 
-  return { host, port, statePath, mqttUrl, mqttUsername, mqttPassword, webhookUrl };
+  return { host, port, statePath, mqttUrl, mqttUsername, mqttPassword, webhookUrl, workerIntervalMs };
 }
