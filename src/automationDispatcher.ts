@@ -1,12 +1,14 @@
 import type { AutomationEvent } from "./automation";
 import type { AutomationSettings } from "./automationSettings";
 import { sendWebhook } from "./webhook";
+import { publishMqtt } from "./mqttPublisher";
 
 const KEY = "powerpilot.automation.dispatched";
 
 export type DispatchResult = {
   dispatched: boolean;
   webhook?: Awaited<ReturnType<typeof sendWebhook>>;
+  mqtt?: Awaited<ReturnType<typeof publishMqtt>>;
 };
 
 function seen(storage: Pick<Storage, "getItem">): Set<string> {
@@ -32,11 +34,16 @@ export async function dispatchAutomation(
     webhook = await sendWebhook(settings.webhookUrl, event);
   }
 
-  const delivered = webhook?.ok === true;
+  let mqtt: DispatchResult["mqtt"];
+  if (settings.mqttEnabled && settings.mqttWebSocketUrl) {
+    mqtt = await publishMqtt(settings.mqttWebSocketUrl, event);
+  }
+
+  const delivered = webhook?.ok === true || mqtt?.ok === true;
   if (delivered) {
     dispatched.add(event.id);
     storage.setItem(KEY, JSON.stringify([...dispatched].slice(-500)));
   }
 
-  return { dispatched: delivered, webhook };
+  return { dispatched: delivered, webhook, mqtt };
 }
