@@ -4,6 +4,8 @@ import { usePrices } from "./usePrices";
 import { cheapestWindows } from "./priceWindows";
 import { notifyPrice, requestNotificationPermission } from "./notifications";
 import { DEFAULT_AUTOMATION_SETTINGS, loadAutomationSettings, saveAutomationSettings, type AutomationSettings } from "./automationSettings";
+import { createAutomationEvent } from "./automation";
+import { dispatchAutomation } from "./automationDispatcher";
 import "./style.css";
 
 const AREAS: PriceArea[] = ["NO1", "NO2", "NO3", "NO4", "NO5"];
@@ -40,8 +42,11 @@ export default function App() {
   const windows = cheapestWindows(prices);
 
   useEffect(() => {
-    if (loadState.source === "live") void notifyPrice(current, thresholds);
-  }, [current.startsAt, current.orePerKwh, loadState.source, thresholds]);
+    if (loadState.source !== "live") return;
+    void notifyPrice(current, thresholds);
+    const event = createAutomationEvent(current, thresholds, loadState.source);
+    void dispatchAutomation(event, automation);
+  }, [current.startsAt, current.orePerKwh, loadState.source, thresholds, automation]);
 
   const updateAutomation = (next: AutomationSettings) => {
     setAutomation(next);
