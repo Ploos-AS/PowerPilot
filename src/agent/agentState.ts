@@ -41,6 +41,7 @@ export type DeliveryState = {
   attempts: number;
   updatedAt: string;
   lastError?: string;
+  nextAttemptAt?: string;
 };
 
 export type AgentState = {
