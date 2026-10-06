@@ -4,14 +4,16 @@ import { JsonFileStateStore } from "./jsonFileStateStore.js";
 import { AgentStateRepository } from "./agentStateRepository.js";
 
 const config = loadAgentConfig();
-const server = createAgentServer(config);
+let ready = false;
+const server = createAgentServer(config, { isReady: () => ready });
 const stateRepository = new AgentStateRepository(new JsonFileStateStore(config.statePath));
-const state = await stateRepository.load();
-
 await listenAgent(server, config);
+const state = await stateRepository.load();
+ready = true;
 console.log(`PowerPilot Agent listening on http://${config.host}:${config.port}; ${state.jobs.length} persisted jobs loaded`);
 
 const shutdown = (signal: string) => {
+  ready = false;
   console.log(`PowerPilot Agent received ${signal}; shutting down`);
   server.close((error?: Error) => {
     if (error) {
