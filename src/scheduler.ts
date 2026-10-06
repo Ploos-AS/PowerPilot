@@ -100,8 +100,33 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new D
   if (best) {
     const latestStart = deadline - job.durationMinutes * 60_000;
     const nowMs = now.getTime();
-    if (nowMs >= latestStart && Date.parse(best.startsAt) <= nowMs) {
-      return { ...best, status: "run-now" };
+    if (nowMs >= latestStart) {
+      const runNow = sorted.findIndex(price => Date.parse(price.startsAt) === nowMs);
+      if (runNow >= 0 && runNow + hours <= sorted.length) {
+        const slice = sorted.slice(runNow, runNow + hours);
+        const contiguous = slice.every(
+          (price, offset) => Date.parse(price.startsAt) === nowMs + offset * HOUR_MS,
+        );
+        const end = nowMs + job.durationMinutes * 60_000;
+        if (contiguous && end <= deadline) {
+          const average = slice.reduce((sum, price) => sum + price.orePerKwh, 0) / hours;
+          const estimatedEnergyKwh = job.estimatedPowerWatts === undefined
+            ? undefined
+            : (job.estimatedPowerWatts / 1000) * (job.durationMinutes / 60);
+          return {
+            status: "run-now",
+            jobId: job.id,
+            startsAt: slice[0].startsAt,
+            endsAt: new Date(end).toISOString(),
+            averageOrePerKwh: average,
+            prices: slice,
+            ...(estimatedEnergyKwh === undefined ? {} : {
+              estimatedEnergyKwh,
+              estimatedSpotCostNok: estimatedEnergyKwh * (average / 100),
+            }),
+          };
+        }
+      }
     }
     return best;
   }
