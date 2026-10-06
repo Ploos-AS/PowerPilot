@@ -15,7 +15,7 @@ const event: AutomationEvent = {
 
 describe("webhook transport", () => {
   it("posts the automation event as JSON", async () => {
-    const fetcher = vi.fn(async () => new Response("", { status: 204 }));
+    const fetcher = vi.fn(async () => new Response(null, { status: 204 }));
     expect(await sendWebhook("https://example.invalid/powerpilot", event, fetcher)).toEqual({ ok: true, status: 204 });
     expect(fetcher).toHaveBeenCalledWith("https://example.invalid/powerpilot", expect.objectContaining({
       method: "POST",
