@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { classifyPrice, DEFAULT_THRESHOLDS, type PriceArea, type Thresholds } from "./domain";
 import { usePrices } from "./usePrices";
 import { cheapestWindows } from "./priceWindows";
+import { notifyPrice, requestNotificationPermission } from "./notifications";
 import "./style.css";
 
 const AREAS: PriceArea[] = ["NO1", "NO2", "NO3", "NO4", "NO5"];
@@ -18,6 +19,7 @@ function load(): Thresholds {
 export default function App() {
   const [area, setArea] = useState<PriceArea>("NO2");
   const [thresholds, setThresholds] = useState<Thresholds>(load);
+  const [notificationStatus, setNotificationStatus] = useState<string>("Notifications off");
   const loadState = usePrices(area);
   const prices = loadState.prices;
   const now = Date.now();
@@ -34,6 +36,15 @@ export default function App() {
 
   const signal = classifyPrice(current.orePerKwh, thresholds);
   const windows = cheapestWindows(prices);
+
+  useEffect(() => {
+    if (loadState.source === "live") void notifyPrice(current, thresholds);
+  }, [current.startsAt, current.orePerKwh, loadState.source, thresholds]);
+
+  const enableNotifications = async () => {
+    const permission = await requestNotificationPermission();
+    setNotificationStatus(permission === "granted" ? "Notifications enabled" : permission === "unsupported" ? "Notifications unsupported" : "Notifications not enabled");
+  };
 
   return <main>
     <header>
@@ -58,6 +69,12 @@ export default function App() {
       Source: {loadState.source === "live" ? "Hva koster strømmen" : "PowerPilot mock"}.
       Live values are spot/base energy prices, not total household cost.
     </p>
+
+    <section className="notifications">
+      <button type="button" onClick={enableNotifications}>Enable price notifications</button>
+      <span>{notificationStatus}</span>
+      <small>Opt-in alerts for negative, favourable and expensive live prices.</small>
+    </section>
 
     <section className="settings">
       <label>Favourable below <input type="number" value={thresholds.favourableBelow}
