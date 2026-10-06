@@ -1,13 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "WebWorker"],
+    "lib": ["ES2022", "DOM"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "noEmit": false,
     "outDir": "dist-agent",
     "rootDir": "src",
     "isolatedModules": false,
+    "skipLibCheck": true,
     "types": ["node"]
   },
   "include": ["src/agent/**/*.ts"],
