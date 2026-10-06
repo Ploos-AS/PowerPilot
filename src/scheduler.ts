@@ -12,7 +12,7 @@ export type FlexibleJob = {
 
 export type ScheduleDecision =
   | {
-      status: "scheduled";
+      status: "scheduled" | "run-now";
       jobId: string;
       startsAt: string;
       endsAt: string;
@@ -27,7 +27,7 @@ export type ScheduleDecision =
 
 const HOUR_MS = 60 * 60 * 1000;
 
-export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[]): ScheduleDecision {
+export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[], now = new Date()): ScheduleDecision {
   const earliest = Date.parse(job.earliestStart);
   const deadline = Date.parse(job.deadline);
 
@@ -48,7 +48,7 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[]): ScheduleDe
     (a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt),
   );
 
-  let best: Extract<ScheduleDecision, { status: "scheduled" }> | null = null;
+  let best: Extract<ScheduleDecision, { status: "scheduled" | "run-now" }> | null = null;
   let eligibleStarts = 0;
 
   for (let i = 0; i <= sorted.length - hours; i++) {
@@ -77,7 +77,14 @@ export function scheduleJob(job: FlexibleJob, prices: HourlyPrice[]): ScheduleDe
     }
   }
 
-  if (best) return best;
+  if (best) {
+    const latestStart = deadline - job.durationMinutes * 60_000;
+    const nowMs = now.getTime();
+    if (nowMs >= latestStart && Date.parse(best.startsAt) <= nowMs) {
+      return { ...best, status: "run-now" };
+    }
+    return best;
+  }
   return {
     status: "unschedulable",
     jobId: job.id,
