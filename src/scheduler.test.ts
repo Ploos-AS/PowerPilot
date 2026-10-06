@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HourlyPrice } from "./domain";
-import { scheduleJob, type FlexibleJob } from "./scheduler";
+import { priorityBufferMs, scheduleJob, type FlexibleJob } from "./scheduler";
 
 const prices = (values: number[]): HourlyPrice[] =>
   values.map((orePerKwh, hour) => ({
@@ -84,6 +84,29 @@ describe("smart scheduler", () => {
       new Date("2026-10-07T01:00:00.000Z"),
     );
     expect(result.status).toBe("scheduled");
+  });
+
+  it("uses deterministic priority buffers", () => {
+    expect(priorityBufferMs("low")).toBe(0);
+    expect(priorityBufferMs("normal")).toBe(60 * 60 * 1000);
+    expect(priorityBufferMs("high")).toBe(2 * 60 * 60 * 1000);
+  });
+
+  it("high priority avoids a cheap window too close to the hard deadline", () => {
+    const input = prices([80, 70, 60, 50, 5, 5, 90, 90]);
+    const low = scheduleJob(job({
+      durationMinutes: 120,
+      deadline: "2026-10-07T06:00:00.000Z",
+      priority: "low",
+    }), input, new Date("2026-10-07T00:00:00.000Z"));
+    const high = scheduleJob(job({
+      durationMinutes: 120,
+      deadline: "2026-10-07T06:00:00.000Z",
+      priority: "high",
+    }), input, new Date("2026-10-07T00:00:00.000Z"));
+
+    expect(low.status === "scheduled" && low.startsAt).toBe("2026-10-07T04:00:00.000Z");
+    expect(high.status === "scheduled" && high.startsAt).toBe("2026-10-07T02:00:00.000Z");
   });
 
   it("rejects sub-hour jobs until interval-aware scheduling lands", () => {
