@@ -51,6 +51,44 @@ describe("job queue planner", () => {
     expect(plan.decisions[0].jobId).toBe("z");
   });
 
+  it("respects a shared power budget", () => {
+    const render = { ...makeJob("render", "high"), estimatedPowerWatts: 1500 };
+    const compile = { ...makeJob("compile", "normal"), estimatedPowerWatts: 800 };
+    const extra = { ...makeJob("extra", "low"), estimatedPowerWatts: 500 };
+    const plan = planJobQueue(
+      [extra, compile, render],
+      prices,
+      3,
+      new Date("2026-10-07T00:00:00.000Z"),
+      2500,
+    );
+    const starts = Object.fromEntries(plan.decisions.map(d => [
+      d.jobId,
+      d.status === "scheduled" ? d.startsAt : d.status,
+    ]));
+    expect(starts.render).toBe("2026-10-07T01:00:00.000Z");
+    expect(starts.compile).toBe("2026-10-07T01:00:00.000Z");
+    expect(starts.extra).toBe("2026-10-07T02:00:00.000Z");
+  });
+
+  it("requires known job power when a power budget is enforced", () => {
+    const plan = planJobQueue(
+      [makeJob("unknown", "low")],
+      prices,
+      2,
+      new Date("2026-10-07T00:00:00.000Z"),
+      2500,
+    );
+    expect(plan.decisions[0]).toMatchObject({
+      jobId: "unknown",
+      status: "unschedulable",
+    });
+  });
+
+  it("rejects an invalid power budget", () => {
+    expect(() => planJobQueue([], prices, 1, new Date(), 0)).toThrow("maxPowerWatts");
+  });
+
   it("rejects invalid queue capacity", () => {
     expect(() => planJobQueue([], prices, 0)).toThrow("maxConcurrentJobs");
   });
