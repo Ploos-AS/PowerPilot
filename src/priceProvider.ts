@@ -33,7 +33,7 @@ export const hvaKosterStrommenProvider: PriceProvider = {
     return rows.map((row) => ({
       startsAt: row.time_start,
       area,
-      orePerKwh: row.NOK_per_kWh * 100,
+      orePerKwh: Math.round(row.NOK_per_kWh * 1_000_000) / 10_000,
     }));
   },
 };
