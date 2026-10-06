@@ -2,6 +2,9 @@ import { createServer, type Server } from "node:http";
 import type { AgentConfig } from "./config.js";
 import type { AgentJobRepository } from "./jobRepository.js";
 import { parseJob } from "./jobValidation.js";
+import { parseAutomationEvent } from "./automationEventValidation.js";
+import type { OutboxRepository } from "./outboxRepository.js";
+import type { DeliveryTransport } from "./deliveryRepository.js";
 
 export type AgentReadiness = {
   isReady(): boolean;
@@ -9,6 +12,8 @@ export type AgentReadiness = {
 
 export type AgentServerDependencies = {
   jobs?: AgentJobRepository;
+  outbox?: OutboxRepository;
+  automationTransports?: DeliveryTransport[];
 };
 
 async function readJson(request: import("node:http").IncomingMessage): Promise<unknown> {
@@ -33,6 +38,28 @@ export function createAgentServer(
       const ready = readiness.isReady();
       response.writeHead(ready ? 200 : 503, { "content-type": "application/json" });
       response.end(JSON.stringify({ status: ready ? "ready" : "starting" }));
+      return;
+    }
+
+    if (request.url === "/api/v1/automation-events" && request.method === "POST" && dependencies.outbox) {
+      try {
+        const event = parseAutomationEvent(await readJson(request));
+        const transports = dependencies.automationTransports ?? [];
+        if (!transports.length) throw new Error("no automation transports are configured");
+        await dependencies.outbox.enqueue({
+          id: event.id,
+          kind: "automation",
+          payload: event,
+          createdAt: new Date().toISOString(),
+        }, transports);
+        response.writeHead(202, { "content-type": "application/json" });
+        response.end(JSON.stringify({ id: event.id, transports }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "automation event enqueue failed";
+        const clientError = error instanceof SyntaxError || message.startsWith("automation event") || message.startsWith("no automation");
+        response.writeHead(clientError ? 400 : 500, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: message }));
+      }
       return;
     }
 
