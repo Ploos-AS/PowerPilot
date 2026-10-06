@@ -1,11 +1,13 @@
-import type { DeliveryState } from "./agentState.js";
+import type { DeliveryState, OutboxEvent } from "./agentState.js";
 import type { DeliveryRepository, DeliveryTransport } from "./deliveryRepository.js";
+import type { OutboxRepository } from "./outboxRepository.js";
 
-export type DeliveryHandler = (delivery: DeliveryState) => Promise<void>;
+export type DeliveryHandler = (delivery: DeliveryState, event: OutboxEvent) => Promise<void>;
 
 export class DeliveryEngine {
   constructor(
     private readonly repository: DeliveryRepository,
+    private readonly outbox: OutboxRepository,
     private readonly handlers: Partial<Record<DeliveryTransport, DeliveryHandler>>,
   ) {}
 
@@ -15,14 +17,16 @@ export class DeliveryEngine {
     let skipped = 0;
 
     for (const delivery of this.repository.listPending()) {
+      const event = this.outbox.get(delivery.eventId);
       const handler = this.handlers[delivery.transport];
-      if (!handler) {
+      if (!event || !handler) {
         skipped++;
         continue;
       }
       try {
-        await handler(delivery);
+        await handler(delivery, event);
         await this.repository.recordSuccess(delivery.eventId, delivery.transport, now);
+        await this.outbox.removeIfDelivered(delivery.eventId);
         delivered++;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
