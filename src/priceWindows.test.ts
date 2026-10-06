@@ -22,7 +22,7 @@ describe("cheapest contiguous windows", () => {
   });
 
   it("does not bridge a missing hour", () => {
-    const input = prices([5, 6, 100]);
+    const input = prices([5, 6]);
     input[1] = { ...input[1], startsAt: "2026-01-01T03:00:00.000Z" };
     expect(cheapestWindow(input, 2)).toBeNull();
   });
