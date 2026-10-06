@@ -1,14 +1,16 @@
 import type { AutomationEvent } from "./automation";
 import type { AutomationSettings } from "./automationSettings";
 import { sendWebhook } from "./webhook";
-import { publishMqtt } from "./mqttPublisher";
+import { publishMqttPublications } from "./mqttPublisher";
+import { mqttPublications } from "./mqtt";
+import { homeAssistantDiscovery } from "./homeAssistant";
 
 const KEY = "powerpilot.automation.dispatched";
 
 export type DispatchResult = {
   dispatched: boolean;
   webhook?: Awaited<ReturnType<typeof sendWebhook>>;
-  mqtt?: Awaited<ReturnType<typeof publishMqtt>>;
+  mqtt?: Awaited<ReturnType<typeof publishMqttPublications>>;
 };
 
 function seen(storage: Pick<Storage, "getItem">): Set<string> {
@@ -36,7 +38,11 @@ export async function dispatchAutomation(
 
   let mqtt: DispatchResult["mqtt"];
   if (settings.mqttEnabled && settings.mqttWebSocketUrl) {
-    mqtt = await publishMqtt(settings.mqttWebSocketUrl, event);
+    const publications = [
+      ...(settings.homeAssistantDiscovery ? homeAssistantDiscovery(event.area) : []),
+      ...mqttPublications(event),
+    ];
+    mqtt = await publishMqttPublications(settings.mqttWebSocketUrl, publications);
   }
 
   const delivered = webhook?.ok === true || mqtt?.ok === true;
