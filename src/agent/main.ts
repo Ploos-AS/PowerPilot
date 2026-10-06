@@ -3,13 +3,16 @@ import { createAgentServer, listenAgent } from "./server.js";
 import { JsonFileStateStore } from "./jsonFileStateStore.js";
 import { AgentStateRepository } from "./agentStateRepository.js";
 import { loadStateOrClose } from "./startup.js";
+import { AgentJobRepository } from "./jobRepository.js";
 
 const config = loadAgentConfig();
 let ready = false;
-const server = createAgentServer(config, { isReady: () => ready });
+let jobs: AgentJobRepository | undefined;
+const server = createAgentServer(config, { isReady: () => ready }, { get jobs() { return jobs; } });
 const stateRepository = new AgentStateRepository(new JsonFileStateStore(config.statePath));
 await listenAgent(server, config);
 const state = await loadStateOrClose(server, stateRepository);
+jobs = new AgentJobRepository(state, stateRepository);
 ready = true;
 console.log(`PowerPilot Agent listening on http://${config.host}:${config.port}; ${state.jobs.length} persisted jobs loaded`);
 
