@@ -3,6 +3,7 @@ import { classifyPrice, DEFAULT_THRESHOLDS, type PriceArea, type Thresholds } fr
 import { usePrices } from "./usePrices";
 import { cheapestWindows } from "./priceWindows";
 import { notifyPrice, requestNotificationPermission } from "./notifications";
+import { DEFAULT_AUTOMATION_SETTINGS, loadAutomationSettings, saveAutomationSettings, type AutomationSettings } from "./automationSettings";
 import "./style.css";
 
 const AREAS: PriceArea[] = ["NO1", "NO2", "NO3", "NO4", "NO5"];
@@ -20,6 +21,7 @@ export default function App() {
   const [area, setArea] = useState<PriceArea>("NO2");
   const [thresholds, setThresholds] = useState<Thresholds>(load);
   const [notificationStatus, setNotificationStatus] = useState<string>("Notifications off");
+  const [automation, setAutomation] = useState<AutomationSettings>(loadAutomationSettings);
   const loadState = usePrices(area);
   const prices = loadState.prices;
   const now = Date.now();
@@ -40,6 +42,11 @@ export default function App() {
   useEffect(() => {
     if (loadState.source === "live") void notifyPrice(current, thresholds);
   }, [current.startsAt, current.orePerKwh, loadState.source, thresholds]);
+
+  const updateAutomation = (next: AutomationSettings) => {
+    setAutomation(next);
+    saveAutomationSettings(next);
+  };
 
   const enableNotifications = async () => {
     const permission = await requestNotificationPermission();
@@ -74,6 +81,23 @@ export default function App() {
       <button type="button" onClick={enableNotifications}>Enable price notifications</button>
       <span>{notificationStatus}</span>
       <small>Opt-in alerts for negative, favourable and expensive live prices.</small>
+    </section>
+
+    <section className="settings">
+      <h2>Automation outputs</h2>
+      <label><input type="checkbox" checked={automation.enabled}
+        onChange={e => updateAutomation({ ...automation, enabled: e.target.checked })}/> Enable outbound automation</label>
+      <label><input type="checkbox" checked={automation.webhookEnabled}
+        onChange={e => updateAutomation({ ...automation, webhookEnabled: e.target.checked })}/> Webhook</label>
+      <label>Webhook URL <input type="url" value={automation.webhookUrl}
+        onChange={e => updateAutomation({ ...automation, webhookUrl: e.target.value })}/></label>
+      <label><input type="checkbox" checked={automation.mqttEnabled}
+        onChange={e => updateAutomation({ ...automation, mqttEnabled: e.target.checked })}/> MQTT over WebSocket</label>
+      <label>MQTT WebSocket URL <input type="url" value={automation.mqttWebSocketUrl}
+        onChange={e => updateAutomation({ ...automation, mqttWebSocketUrl: e.target.value })}/></label>
+      <label><input type="checkbox" checked={automation.homeAssistantDiscovery}
+        onChange={e => updateAutomation({ ...automation, homeAssistantDiscovery: e.target.checked })}/> Home Assistant MQTT Discovery</label>
+      <small>Transport settings are stored locally. Do not put passwords or tokens in these fields.</small>
     </section>
 
     <section className="settings">
