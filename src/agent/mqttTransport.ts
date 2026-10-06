@@ -1,5 +1,4 @@
 import mqtt from "mqtt";
-import type { MqttPublication } from "../mqtt.js";
 
 export type AgentMqttConfig = {
   url: string;
@@ -7,9 +6,15 @@ export type AgentMqttConfig = {
   password?: string;
 };
 
+export type AgentMqttPublication = {
+  topic: string;
+  payload: string;
+  retain: boolean;
+};
+
 export async function publishAgentMqtt(
   config: AgentMqttConfig,
-  publications: MqttPublication[],
+  publications: AgentMqttPublication[],
 ): Promise<void> {
   const client = mqtt.connect(config.url, {
     ...(config.username ? { username: config.username } : {}),
