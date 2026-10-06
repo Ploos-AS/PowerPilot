@@ -16,9 +16,13 @@ export function planJobQueue(
   prices: HourlyPrice[],
   maxConcurrentJobs = 1,
   now = new Date(),
+  maxPowerWatts?: number,
 ): QueuePlan {
   if (!Number.isInteger(maxConcurrentJobs) || maxConcurrentJobs < 1) {
     throw new Error("maxConcurrentJobs must be a positive integer");
+  }
+  if (maxPowerWatts !== undefined && (!Number.isFinite(maxPowerWatts) || maxPowerWatts <= 0)) {
+    throw new Error("maxPowerWatts must be positive");
   }
 
   const ordered = [...jobs].sort((a, b) =>
@@ -28,12 +32,16 @@ export function planJobQueue(
   );
 
   const reservations = new Map<string, number>();
+  const powerReservations = new Map<string, number>();
   const decisions: ScheduleDecision[] = [];
 
   for (const job of ordered) {
-    const available = prices.filter(price =>
-      (reservations.get(price.startsAt) ?? 0) < maxConcurrentJobs,
-    );
+    const available = prices.filter(price => {
+      if ((reservations.get(price.startsAt) ?? 0) >= maxConcurrentJobs) return false;
+      if (maxPowerWatts === undefined) return true;
+      if (job.estimatedPowerWatts === undefined) return false;
+      return (powerReservations.get(price.startsAt) ?? 0) + job.estimatedPowerWatts <= maxPowerWatts;
+    });
     const decision = scheduleJob(job, available, now);
     decisions.push(decision);
 
@@ -43,6 +51,12 @@ export function planJobQueue(
           price.startsAt,
           (reservations.get(price.startsAt) ?? 0) + 1,
         );
+        if (job.estimatedPowerWatts !== undefined) {
+          powerReservations.set(
+            price.startsAt,
+            (powerReservations.get(price.startsAt) ?? 0) + job.estimatedPowerWatts,
+          );
+        }
       }
     }
   }
