@@ -8,7 +8,8 @@
     "build": "vite build",
     "test": "vitest run",
     "build:agent": "tsc -p tsconfig.agent.json",
-    "start:agent": "node dist-agent/agent/main.js"
+    "start:agent": "node dist-agent/agent/main.js",
+    "smoke:agent": "node scripts/smoke-agent.mjs"
   },
   "dependencies": {
     "react": "latest",
