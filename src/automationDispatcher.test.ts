@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AutomationEvent } from "./automation";
 import { DEFAULT_AUTOMATION_SETTINGS } from "./automationSettings";
 import { dispatchAutomation } from "./automationDispatcher";
+import * as mqttPublisher from "./mqttPublisher";
 
 const event: AutomationEvent = {
   schema: "powerpilot.automation.v1",
@@ -40,6 +41,39 @@ describe("automation dispatcher", () => {
     expect((await dispatchAutomation(event, settings, state)).dispatched).toBe(true);
     expect((await dispatchAutomation(event, settings, state)).dispatched).toBe(false);
     vi.unstubAllGlobals();
+  });
+
+  it("publishes state plus Home Assistant discovery when enabled", async () => {
+    const publish = vi.spyOn(mqttPublisher, "publishMqttPublications").mockResolvedValue({ ok: true, published: 7 });
+    const settings = {
+      ...DEFAULT_AUTOMATION_SETTINGS,
+      enabled: true,
+      mqttEnabled: true,
+      mqttWebSocketUrl: "wss://broker.example.invalid/mqtt",
+      homeAssistantDiscovery: true,
+    };
+    const result = await dispatchAutomation(event, settings, storage());
+    expect(result.dispatched).toBe(true);
+    expect(publish).toHaveBeenCalledOnce();
+    const publications = publish.mock.calls[0][1];
+    expect(publications).toHaveLength(7);
+    expect(publications.filter(p => p.topic.startsWith("homeassistant/"))).toHaveLength(3);
+    expect(publications.filter(p => p.topic.startsWith("powerpilot/"))).toHaveLength(4);
+    publish.mockRestore();
+  });
+
+  it("publishes only PowerPilot state when discovery is disabled", async () => {
+    const publish = vi.spyOn(mqttPublisher, "publishMqttPublications").mockResolvedValue({ ok: true, published: 4 });
+    const settings = {
+      ...DEFAULT_AUTOMATION_SETTINGS,
+      enabled: true,
+      mqttEnabled: true,
+      mqttWebSocketUrl: "wss://broker.example.invalid/mqtt",
+      homeAssistantDiscovery: false,
+    };
+    await dispatchAutomation(event, settings, storage());
+    expect(publish.mock.calls[0][1]).toHaveLength(4);
+    publish.mockRestore();
   });
 
   it("does not mark an event dispatched when no transport is configured", async () => {
