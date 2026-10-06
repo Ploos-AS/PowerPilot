@@ -16,7 +16,7 @@ export class DeliveryEngine {
     let failed = 0;
     let skipped = 0;
 
-    for (const delivery of this.repository.listPending()) {
+    for (const delivery of this.repository.listPending(now)) {
       const event = this.outbox.get(delivery.eventId);
       const handler = this.handlers[delivery.transport];
       if (!event || !handler) {
