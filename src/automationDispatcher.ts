@@ -32,11 +32,11 @@ export async function dispatchAutomation(
     webhook = await sendWebhook(settings.webhookUrl, event);
   }
 
-  const attempted = Boolean(webhook);
-  if (attempted) {
+  const delivered = webhook?.ok === true;
+  if (delivered) {
     dispatched.add(event.id);
     storage.setItem(KEY, JSON.stringify([...dispatched].slice(-500)));
   }
 
-  return { dispatched: attempted, webhook };
+  return { dispatched: delivered, webhook };
 }
