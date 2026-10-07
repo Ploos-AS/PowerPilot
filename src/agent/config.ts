@@ -1,3 +1,4 @@
+import type { PriceArea } from "../domain.js";
 export type AgentConfig = {
   host: string;
   port: number;
@@ -8,6 +9,8 @@ export type AgentConfig = {
   webhookUrl?: string;
   workerIntervalMs: number;
   apiToken?: string;
+  priceArea: PriceArea;
+  pricePollIntervalMs: number;
 };
 
 export function loadAgentConfig(
@@ -27,6 +30,10 @@ export function loadAgentConfig(
   const mqttPassword = env.POWERPILOT_MQTT_PASSWORD || undefined;
   const webhookUrl = env.POWERPILOT_WEBHOOK_URL?.trim() || undefined;
   const apiToken = env.POWERPILOT_AGENT_TOKEN || undefined;
+  const priceArea = (env.POWERPILOT_PRICE_AREA?.trim() || "NO2") as PriceArea;
+  if (!["NO1", "NO2", "NO3", "NO4", "NO5"].includes(priceArea)) throw new Error("POWERPILOT_PRICE_AREA must be NO1, NO2, NO3, NO4, or NO5");
+  const pricePollIntervalMs = Number(env.POWERPILOT_PRICE_POLL_INTERVAL_MS?.trim() || "300000");
+  if (!Number.isInteger(pricePollIntervalMs) || pricePollIntervalMs < 60000) throw new Error("POWERPILOT_PRICE_POLL_INTERVAL_MS must be an integer of at least 60000");
   const workerIntervalMs = Number(env.POWERPILOT_WORKER_INTERVAL_MS?.trim() || "5000");
   if (!Number.isInteger(workerIntervalMs) || workerIntervalMs < 1000) {
     throw new Error("POWERPILOT_WORKER_INTERVAL_MS must be an integer of at least 1000");
@@ -36,5 +43,5 @@ export function loadAgentConfig(
     throw new Error("POWERPILOT_MQTT_URL is required when MQTT credentials are configured");
   }
 
-  return { host, port, statePath, mqttUrl, mqttUsername, mqttPassword, webhookUrl, workerIntervalMs, apiToken };
+  return { host, port, statePath, mqttUrl, mqttUsername, mqttPassword, webhookUrl, workerIntervalMs, apiToken, priceArea, pricePollIntervalMs };
 }
