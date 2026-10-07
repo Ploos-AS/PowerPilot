@@ -90,4 +90,23 @@ describe("PricePoller", () => {
     expect(state.outbox).toEqual([]);
   });
 
+  it("resolves Oslo calendar dates across daylight-saving transitions", async () => {
+    const requested: string[] = [];
+    const checkingProvider: PriceProvider = {
+      id: "dst-check",
+      async getPrices(_area, date) {
+        requested.push([date.getFullYear(), date.getMonth() + 1, date.getDate()].join("-"));
+        return [];
+      },
+    };
+    const state = emptyAgentState();
+    const poller = new PricePoller(checkingProvider, new OutboxRepository(state, new AgentStateRepository(new MemoryStore())), "NO2", ["webhook"]);
+    // Spring: 01:30 UTC is 03:30 CEST, after the skipped local hour.
+    await poller.poll(new Date("2026-03-29T01:30:00Z"));
+    // Autumn: both occurrences of 02:30 local must map to the same calendar day.
+    await poller.poll(new Date("2026-10-25T00:30:00Z"));
+    await poller.poll(new Date("2026-10-25T01:30:00Z"));
+    expect(requested).toEqual(["2026-3-29", "2026-10-25", "2026-10-25"]);
+  });
+
 });
