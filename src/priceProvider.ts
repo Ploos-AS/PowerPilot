@@ -1,4 +1,4 @@
-import type { HourlyPrice, PriceArea } from "./domain";
+import type { HourlyPrice, PriceArea } from "./domain.js";
 
 export interface PriceProvider {
   readonly id: string;
