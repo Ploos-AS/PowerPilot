@@ -144,4 +144,24 @@ describe("PricePoller", () => {
     expect(state.outbox.map(event => event.payload.orePerKwh)).toEqual([20, 90]);
   });
 
+  it("selects exact quarter-hour intervals and rejects gaps", async () => {
+    const state = emptyAgentState();
+    const quarterHourProvider: PriceProvider = {
+      id: "quarter-hour",
+      async getPrices(area) {
+        return [
+          { area, startsAt: "2026-10-07T10:00:00Z", endsAt: "2026-10-07T10:15:00Z", orePerKwh: 10 },
+          { area, startsAt: "2026-10-07T10:15:00Z", endsAt: "2026-10-07T10:30:00Z", orePerKwh: 90 },
+          { area, startsAt: "2026-10-07T10:45:00Z", endsAt: "2026-10-07T11:00:00Z", orePerKwh: 20 },
+        ];
+      },
+    };
+    const poller = new PricePoller(quarterHourProvider, new OutboxRepository(state, new AgentStateRepository(new MemoryStore())), "NO2", ["webhook"]);
+    expect(await poller.poll(new Date("2026-10-07T10:14:59Z"))).toBe(1);
+    expect(await poller.poll(new Date("2026-10-07T10:15:00Z"))).toBe(1);
+    expect(await poller.poll(new Date("2026-10-07T10:30:00Z"))).toBe(0);
+    expect(await poller.poll(new Date("2026-10-07T10:45:00Z"))).toBe(1);
+    expect(state.outbox.map(event => event.payload.orePerKwh)).toEqual([10, 90, 20]);
+  });
+
 });
