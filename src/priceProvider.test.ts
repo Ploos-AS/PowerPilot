@@ -21,6 +21,7 @@ describe("Hva koster strømmen provider", () => {
     const result = await hvaKosterStrommenProvider.getPrices("NO2", new Date(2026, 9, 6, 12));
     expect(result).toEqual([{
       startsAt: "2026-10-06T00:00:00+02:00",
+      endsAt: "2026-10-06T01:00:00+02:00",
       area: "NO2",
       orePerKwh: 42.31
     }]);
