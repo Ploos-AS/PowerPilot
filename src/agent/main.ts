@@ -8,6 +8,8 @@ import { createDeliveryEngine } from "./deliveryRuntime.js";
 import { AgentWorker } from "./worker.js";
 import { OutboxRepository } from "./outboxRepository.js";
 import type { DeliveryTransport } from "./deliveryRepository.js";
+import { PricePoller } from "./pricePoller.js";
+import { hvaKosterStrommenProvider } from "../priceProvider.js";
 
 const config = loadAgentConfig();
 let ready = false;
@@ -29,14 +31,20 @@ jobs = new AgentJobRepository(state, stateRepository);
 outbox = new OutboxRepository(state, stateRepository);
 
 const deliveryEngine = createDeliveryEngine(config, state, stateRepository);
-const worker = new AgentWorker(async () => {
+const deliveryWorker = new AgentWorker(async () => {
   const result = await deliveryEngine.runOnce();
   if (result.delivered || result.failed) {
     console.log(`PowerPilot Agent delivery: ${result.delivered} delivered, ${result.failed} failed`);
   }
 }, config.workerIntervalMs);
+const pricePoller = new PricePoller(hvaKosterStrommenProvider, outbox, config.priceArea, automationTransports);
+const priceWorker = new AgentWorker(async () => {
+  const enqueued = await pricePoller.poll();
+  if (enqueued) console.log(`PowerPilot Agent price: ${config.priceArea} automation event queued`);
+}, config.pricePollIntervalMs);
 
-await worker.start();
+await deliveryWorker.start();
+await priceWorker.start();
 ready = true;
 console.log(`PowerPilot Agent listening on http://${config.host}:${config.port}; ${state.jobs.length} persisted jobs loaded`);
 
@@ -45,7 +53,7 @@ const shutdown = async (signal: string) => {
   if (shuttingDown) return;
   shuttingDown = true;
   ready = false;
-  await worker.stop();
+  await Promise.all([priceWorker.stop(), deliveryWorker.stop()]);
   console.log(`PowerPilot Agent received ${signal}; shutting down`);
   await new Promise<void>((resolve, reject) => {
     server.close(error => error ? reject(error) : resolve());
