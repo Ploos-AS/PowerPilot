@@ -2,6 +2,11 @@ import type { AgentState, OutboxEvent } from "./agentState.js";
 import type { AgentStateRepository } from "./agentStateRepository.js";
 import type { DeliveryTransport } from "./deliveryRepository.js";
 
+function sameLogicalEvent(a: OutboxEvent, b: OutboxEvent): boolean {
+  return a.id === b.id && a.kind === b.kind &&
+    JSON.stringify(a.payload) === JSON.stringify(b.payload);
+}
+
 export class OutboxRepository {
   constructor(
     private readonly state: AgentState,
@@ -15,7 +20,7 @@ export class OutboxRepository {
 
   async enqueue(event: OutboxEvent, transports: DeliveryTransport[]): Promise<void> {
     const existing = this.state.outbox.find(item => item.id === event.id);
-    if (existing && JSON.stringify(existing) !== JSON.stringify(event)) {
+    if (existing && !sameLogicalEvent(existing, event)) {
       throw new Error(`Conflicting outbox event ${event.id}`);
     }
     const previousOutboxLength = this.state.outbox.length;
