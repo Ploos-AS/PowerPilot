@@ -1,0 +1,20 @@
+services:
+  powerpilot-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      POWERPILOT_AGENT_TOKEN: ${POWERPILOT_AGENT_TOKEN:?set POWERPILOT_AGENT_TOKEN}
+      POWERPILOT_WEBHOOK_URL: ${POWERPILOT_WEBHOOK_URL:-}
+      POWERPILOT_MQTT_URL: ${POWERPILOT_MQTT_URL:-}
+      POWERPILOT_MQTT_USERNAME: ${POWERPILOT_MQTT_USERNAME:-}
+      POWERPILOT_MQTT_PASSWORD: ${POWERPILOT_MQTT_PASSWORD:-}
+    volumes:
+      - powerpilot-agent-data:/data
+    init: true
+
+volumes:
+  powerpilot-agent-data:
