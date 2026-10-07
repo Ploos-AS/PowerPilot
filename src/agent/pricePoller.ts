@@ -26,7 +26,7 @@ export class PricePoller {
     const current = [...prices]
       .filter(price => Date.parse(price.startsAt) <= nowMs)
       .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt))[0];
-    if (!current) return 0;
+    if (!current || !Number.isFinite(Date.parse(current.startsAt)) || nowMs - Date.parse(current.startsAt) >= 60 * 60 * 1000) return 0;
 
     const event = createAutomationEvent(current, DEFAULT_THRESHOLDS, this.provider.id);
     await this.outbox.enqueue({
