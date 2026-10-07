@@ -61,6 +61,12 @@ export function createAgentServer(
       return;
     }
 
+    if (request.url?.startsWith("/api/v1/") && !readiness.isReady()) {
+      response.writeHead(503, { "content-type": "application/json", "retry-after": "1" });
+      response.end(JSON.stringify({ error: "agent_not_ready" }));
+      return;
+    }
+
     if (request.url === "/api/v1/automation-events" && request.method === "POST" && dependencies.outbox) {
       try {
         const event = parseAutomationEvent(await readJson(request));
