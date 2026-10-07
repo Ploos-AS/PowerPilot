@@ -16,3 +16,19 @@ jobs:
       - run: npm run build
       - run: npm run build:agent
       - run: npm run smoke:agent
+      - name: Build Agent image
+        run: docker build -f Dockerfile.agent -t powerpilot-agent:ci .
+      - name: Smoke Agent image
+        run: |
+          set -euo pipefail
+          docker run -d --name powerpilot-agent-ci -p 127.0.0.1:18788:8787 \
+            -e POWERPILOT_AGENT_TOKEN=ci-token powerpilot-agent:ci
+          trap 'docker rm -f powerpilot-agent-ci >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18788/healthz >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:18788/healthz
+          curl --fail http://127.0.0.1:18788/readyz
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE http://127.0.0.1:18788/api/v1/jobs/missing)" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H 'Authorization: Bearer ci-token' http://127.0.0.1:18788/api/v1/jobs/missing)" = "404"
