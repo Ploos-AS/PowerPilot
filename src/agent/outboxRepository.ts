@@ -14,11 +14,16 @@ export class OutboxRepository {
   }
 
   async enqueue(event: OutboxEvent, transports: DeliveryTransport[]): Promise<void> {
-    if (this.state.outbox.some(item => item.id === event.id)) return;
+    const existing = this.state.outbox.find(item => item.id === event.id);
+    if (existing && JSON.stringify(existing) !== JSON.stringify(event)) {
+      throw new Error(`Conflicting outbox event ${event.id}`);
+    }
     const previousOutboxLength = this.state.outbox.length;
     const previousDeliveriesLength = this.state.deliveries.length;
-    this.state.outbox.push(structuredClone(event));
+    if (!existing) this.state.outbox.push(structuredClone(event));
+    const existingTransports = new Set(this.state.deliveries.filter(item => item.eventId === event.id).map(item => item.transport));
     for (const transport of [...new Set(transports)]) {
+      if (existingTransports.has(transport)) continue;
       this.state.deliveries.push({
         eventId: event.id,
         transport,
@@ -27,6 +32,7 @@ export class OutboxRepository {
         updatedAt: event.createdAt,
       });
     }
+    if (this.state.outbox.length === previousOutboxLength && this.state.deliveries.length === previousDeliveriesLength) return;
     try {
       await this.repository.save(this.state);
     } catch (error) {
@@ -34,6 +40,14 @@ export class OutboxRepository {
       this.state.deliveries.splice(previousDeliveriesLength);
       throw error;
     }
+  }
+
+  async pruneDelivered(): Promise<number> {
+    let removed = 0;
+    for (const event of [...this.state.outbox]) {
+      if (await this.removeIfDelivered(event.id)) removed++;
+    }
+    return removed;
   }
 
   async removeIfDelivered(eventId: string): Promise<boolean> {
