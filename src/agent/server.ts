@@ -16,9 +16,19 @@ export type AgentServerDependencies = {
   automationTransports?: DeliveryTransport[];
 };
 
+const MAX_JSON_BODY_BYTES = 64 * 1024;
+
+class RequestBodyTooLargeError extends Error {}
+
 async function readJson(request: import("node:http").IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
-  for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  let size = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > MAX_JSON_BODY_BYTES) throw new RequestBodyTooLargeError("request body exceeds 64 KiB");
+    chunks.push(buffer);
+  }
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
@@ -66,8 +76,9 @@ export function createAgentServer(
         response.end(JSON.stringify({ id: event.id, transports }));
       } catch (error) {
         const message = error instanceof Error ? error.message : "automation event enqueue failed";
+        const tooLarge = error instanceof RequestBodyTooLargeError;
         const clientError = error instanceof SyntaxError || message.startsWith("automation event") || message.startsWith("no automation");
-        response.writeHead(clientError ? 400 : 500, { "content-type": "application/json" });
+        response.writeHead(tooLarge ? 413 : clientError ? 400 : 500, { "content-type": "application/json" });
         response.end(JSON.stringify({ error: message }));
       }
       return;
@@ -86,7 +97,8 @@ export function createAgentServer(
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ job }));
       } catch (error) {
-        response.writeHead(error instanceof SyntaxError || (error instanceof Error && error.message.startsWith("job")) ? 400 : 500, { "content-type": "application/json" });
+        const tooLarge = error instanceof RequestBodyTooLargeError;
+        response.writeHead(tooLarge ? 413 : error instanceof SyntaxError || (error instanceof Error && error.message.startsWith("job")) ? 400 : 500, { "content-type": "application/json" });
         response.end(JSON.stringify({ error: error instanceof Error ? error.message : "job update failed" }));
       }
       return;
