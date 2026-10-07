@@ -32,6 +32,28 @@ describe("agent server readiness", () => {
     expect(available.status).toBe(200);
     await expect(available.json()).resolves.toEqual({ status: "ready" });
   });
+  it("gates API until ready while leaving probes available", async () => {
+    let ready = false;
+    const config = { host: "127.0.0.1", port: 0, statePath: "unused" };
+    const jobs = { list: () => [], put: async () => undefined, delete: async () => false } as any;
+    const server = createAgentServer(config, { isReady: () => ready }, { jobs });
+    servers.push(server);
+    await listenAgent(server, config);
+    const port = (server.address() as AddressInfo).port;
+    const base = `http://127.0.0.1:${port}`;
+
+    const unavailable = await fetch(`${base}/api/v1/jobs`);
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.headers.get("retry-after")).toBe("1");
+    await expect(unavailable.json()).resolves.toEqual({ error: "agent_not_ready" });
+    expect((await fetch(`${base}/healthz`)).status).toBe(200);
+
+    ready = true;
+    const available = await fetch(`${base}/api/v1/jobs`);
+    expect(available.status).toBe(200);
+    await expect(available.json()).resolves.toEqual({ jobs: [] });
+  });
+
   it("keeps probes open while requiring the configured bearer token for mutations", async () => {
     const config = { host: "127.0.0.1", port: 0, statePath: "unused", apiToken: "test-token" };
     const jobs = {
