@@ -45,7 +45,7 @@ const shutdown = async (signal: string) => {
   if (shuttingDown) return;
   shuttingDown = true;
   ready = false;
-  worker.stop();
+  await worker.stop();
   console.log(`PowerPilot Agent received ${signal}; shutting down`);
   await new Promise<void>((resolve, reject) => {
     server.close(error => error ? reject(error) : resolve());
