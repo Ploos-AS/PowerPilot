@@ -32,3 +32,28 @@ jobs:
           curl --fail http://127.0.0.1:18788/readyz
           test "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE http://127.0.0.1:18788/api/v1/jobs/missing)" = "401"
           test "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H 'Authorization: Bearer ci-token' http://127.0.0.1:18788/api/v1/jobs/missing)" = "404"
+      - name: Verify Agent state survives container replacement
+        run: |
+          set -euo pipefail
+          docker volume create powerpilot-agent-ci-data
+          cleanup() {
+            docker rm -f powerpilot-agent-persist >/dev/null 2>&1 || true
+            docker volume rm powerpilot-agent-ci-data >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          start() {
+            docker run -d --name powerpilot-agent-persist -p 127.0.0.1:18789:8787 \
+              -v powerpilot-agent-ci-data:/data -e POWERPILOT_AGENT_TOKEN=ci-token powerpilot-agent:ci
+            for i in $(seq 1 30); do
+              if curl --fail --silent http://127.0.0.1:18789/readyz >/dev/null; then return; fi
+              sleep 1
+            done
+            return 1
+          }
+          start
+          curl --fail -X PUT -H 'Authorization: Bearer ci-token' -H 'Content-Type: application/json' \
+            --data '{"id":"persist-ci","durationMinutes":60,"earliestStart":"2026-10-08T00:00:00Z","deadline":"2026-10-08T03:00:00Z","priority":"normal"}' \
+            http://127.0.0.1:18789/api/v1/jobs
+          docker rm -f powerpilot-agent-persist
+          start
+          curl --fail --silent http://127.0.0.1:18789/api/v1/jobs | grep '"id":"persist-ci"'
