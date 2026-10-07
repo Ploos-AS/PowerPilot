@@ -109,4 +109,39 @@ describe("PricePoller", () => {
     expect(requested).toEqual(["2026-3-29", "2026-10-25", "2026-10-25"]);
   });
 
+  it("distinguishes repeated autumn-hour price instants", async () => {
+    const state = emptyAgentState();
+    const autumnProvider: PriceProvider = {
+      id: "dst-autumn",
+      async getPrices(area) {
+        return [
+          { area, startsAt: "2026-10-25T02:00:00+02:00", orePerKwh: 20 },
+          { area, startsAt: "2026-10-25T02:00:00+01:00", orePerKwh: 90 },
+        ];
+      },
+    };
+    const poller = new PricePoller(autumnProvider, new OutboxRepository(state, new AgentStateRepository(new MemoryStore())), "NO2", ["webhook"]);
+    await poller.poll(new Date("2026-10-25T00:30:00Z"));
+    await poller.poll(new Date("2026-10-25T01:30:00Z"));
+    expect(state.outbox.map(event => event.payload.orePerKwh)).toEqual([20, 90]);
+    expect(new Set(state.outbox.map(event => event.id)).size).toBe(2);
+  });
+
+  it("accepts spring-forward prices without inventing a missing hour", async () => {
+    const state = emptyAgentState();
+    const springProvider: PriceProvider = {
+      id: "dst-spring",
+      async getPrices(area) {
+        return [
+          { area, startsAt: "2026-03-29T01:00:00+01:00", orePerKwh: 20 },
+          { area, startsAt: "2026-03-29T03:00:00+02:00", orePerKwh: 90 },
+        ];
+      },
+    };
+    const poller = new PricePoller(springProvider, new OutboxRepository(state, new AgentStateRepository(new MemoryStore())), "NO2", ["webhook"]);
+    await poller.poll(new Date("2026-03-29T00:30:00Z"));
+    await poller.poll(new Date("2026-03-29T01:30:00Z"));
+    expect(state.outbox.map(event => event.payload.orePerKwh)).toEqual([20, 90]);
+  });
+
 });
