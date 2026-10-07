@@ -1,5 +1,7 @@
 import type { HourlyPrice, PriceArea } from "./domain.js";
 
+export const PRICE_PROVIDER_TIMEOUT_MS = 10_000;
+
 export interface PriceProvider {
   readonly id: string;
   getPrices(area: PriceArea, date: Date): Promise<HourlyPrice[]>;
@@ -25,7 +27,7 @@ export function priceUrl(area: PriceArea, date: Date): string {
 export const hvaKosterStrommenProvider: PriceProvider = {
   id: "hvakosterstrommen",
   async getPrices(area, date) {
-    const response = await fetch(priceUrl(area, date));
+    const response = await fetch(priceUrl(area, date), { signal: AbortSignal.timeout(PRICE_PROVIDER_TIMEOUT_MS) });
     if (!response.ok) {
       throw new Error(`Price provider returned HTTP ${response.status}`);
     }
