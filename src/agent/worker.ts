@@ -2,7 +2,7 @@ export type WorkerTask = () => Promise<void>;
 
 export class AgentWorker {
   private timer?: NodeJS.Timeout;
-  private running = false;
+  private inFlight?: Promise<void>;
   private stopped = false;
 
   constructor(
@@ -11,27 +11,28 @@ export class AgentWorker {
   ) {}
 
   async start(): Promise<void> {
-    if (this.stopped || this.timer) return;
-    await this.run();
+    if (this.stopped || this.timer || this.inFlight) return;
+    await this.trigger();
     if (this.stopped) return;
-    this.timer = setInterval(() => void this.run(), this.intervalMs);
+    this.timer = setInterval(() => void this.trigger(), this.intervalMs);
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     this.stopped = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    await this.inFlight;
   }
 
-  private async run(): Promise<void> {
-    if (this.running || this.stopped) return;
-    this.running = true;
-    try {
-      await this.task();
-    } catch (error) {
+  private trigger(): Promise<void> {
+    if (this.stopped) return Promise.resolve();
+    if (this.inFlight) return this.inFlight;
+    const run = this.task().catch(error => {
       console.error("PowerPilot Agent worker iteration failed", error);
-    } finally {
-      this.running = false;
-    }
+    });
+    this.inFlight = run.finally(() => {
+      if (this.inFlight === run || this.inFlight) this.inFlight = undefined;
+    });
+    return this.inFlight;
   }
 }
