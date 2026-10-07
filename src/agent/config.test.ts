@@ -13,6 +13,8 @@ describe("agent config", () => {
       webhookUrl: undefined,
       workerIntervalMs: 5000,
       apiToken: undefined,
+      priceArea: "NO2",
+      pricePollIntervalMs: 300000,
     });
   });
 
@@ -26,6 +28,8 @@ describe("agent config", () => {
       POWERPILOT_MQTT_PASSWORD: "secret",
       POWERPILOT_WEBHOOK_URL: "https://example.test/hook",
       POWERPILOT_WORKER_INTERVAL_MS: "10000",
+      POWERPILOT_PRICE_AREA: "NO3",
+      POWERPILOT_PRICE_POLL_INTERVAL_MS: "120000",
     })).toEqual({
       host: "127.0.0.1",
       port: 9000,
@@ -35,6 +39,9 @@ describe("agent config", () => {
       mqttPassword: "secret",
       webhookUrl: "https://example.test/hook",
       workerIntervalMs: 10000,
+      apiToken: undefined,
+      priceArea: "NO3",
+      pricePollIntervalMs: 120000,
     });
   });
 
@@ -54,5 +61,9 @@ describe("agent config", () => {
     expect(() => loadAgentConfig({ POWERPILOT_WORKER_INTERVAL_MS: "999" })).toThrow(
       "POWERPILOT_WORKER_INTERVAL_MS",
     );
+  });
+  it("rejects invalid price area and too-fast polling", () => {
+    expect(() => loadAgentConfig({ POWERPILOT_PRICE_AREA: "NO6" })).toThrow("POWERPILOT_PRICE_AREA");
+    expect(() => loadAgentConfig({ POWERPILOT_PRICE_POLL_INTERVAL_MS: "59999" })).toThrow("POWERPILOT_PRICE_POLL_INTERVAL_MS");
   });
 });
