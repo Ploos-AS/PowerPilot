@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { hvaKosterStrommenProvider, priceUrl } from "./priceProvider";
+import { hvaKosterStrommenProvider, PRICE_PROVIDER_TIMEOUT_MS, priceUrl } from "./priceProvider";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -24,6 +24,15 @@ describe("Hva koster strømmen provider", () => {
       area: "NO2",
       orePerKwh: 42.31
     }]);
+  });
+
+  it("passes a bounded abort signal to fetch", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+      new Response("[]", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await hvaKosterStrommenProvider.getPrices("NO2", new Date(2026, 9, 6, 12));
+    expect(PRICE_PROVIDER_TIMEOUT_MS).toBe(10_000);
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("surfaces upstream HTTP failures", async () => {
