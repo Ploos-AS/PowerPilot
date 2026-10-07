@@ -8,8 +8,14 @@ import type { StateStore } from "./stateStore";
 
 class MemoryStore implements StateStore<unknown> {
   value?: unknown;
-  async load() { return this.value; }
-  async save(value: unknown) { this.value = structuredClone(value); }
+  saves = 0;
+  failOnSave?: number;
+  async load() { return structuredClone(this.value); }
+  async save(value: unknown) {
+    this.saves++;
+    if (this.saves === this.failOnSave) throw new Error("injected save failure");
+    this.value = structuredClone(value);
+  }
 }
 
 const event = {
