@@ -1,4 +1,4 @@
-import { classifyPrice, type HourlyPrice, type PriceSignal, type Thresholds } from "./domain";
+import { classifyPrice, type HourlyPrice, type PriceSignal, type Thresholds } from "./domain.js";
 
 export type AutomationPolicy =
   | "ALLOW_LOW_PRIORITY_COMPUTE"
