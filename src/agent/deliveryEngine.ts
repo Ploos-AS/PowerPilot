@@ -16,6 +16,8 @@ export class DeliveryEngine {
     let failed = 0;
     let skipped = 0;
 
+    await this.outbox.pruneDelivered();
+
     for (const delivery of this.repository.listPending(now)) {
       const event = this.outbox.get(delivery.eventId);
       const handler = this.handlers[delivery.transport];
@@ -25,14 +27,15 @@ export class DeliveryEngine {
       }
       try {
         await handler(delivery, event);
-        await this.repository.recordSuccess(delivery.eventId, delivery.transport, now);
-        await this.outbox.removeIfDelivered(delivery.eventId);
-        delivered++;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         await this.repository.recordFailure(delivery.eventId, delivery.transport, message, now);
         failed++;
+        continue;
       }
+      await this.repository.recordSuccess(delivery.eventId, delivery.transport, now);
+      delivered++;
+      await this.outbox.removeIfDelivered(delivery.eventId);
     }
 
     return { delivered, failed, skipped };
