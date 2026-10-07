@@ -57,4 +57,37 @@ describe("PricePoller", () => {
     expect(state.outbox).toHaveLength(1);
     expect(state.deliveries).toHaveLength(2);
   });
+  it("uses the Oslo calendar day around UTC midnight", async () => {
+    const requested: string[] = [];
+    const checkingProvider: PriceProvider = {
+      id: "date-check",
+      async getPrices(_area, date) {
+        requested.push([date.getFullYear(), date.getMonth() + 1, date.getDate()].join("-"));
+        return [];
+      },
+    };
+    const state = emptyAgentState();
+    const poller = new PricePoller(checkingProvider, new OutboxRepository(state, new AgentStateRepository(new MemoryStore())), "NO2", ["webhook"]);
+    await poller.poll(new Date("2026-10-07T22:30:00Z"));
+    expect(requested).toEqual(["2026-10-8"]);
+  });
+
+  it("does not publish a stale hourly period", async () => {
+    const state = emptyAgentState();
+    const poller = new PricePoller(provider, new OutboxRepository(state, new AgentStateRepository(new MemoryStore())), "NO2", ["webhook"]);
+    expect(await poller.poll(new Date("2026-10-07T13:00:00Z"))).toBe(0);
+    expect(state.outbox).toEqual([]);
+  });
+
+  it("propagates provider errors without enqueuing events", async () => {
+    const failingProvider: PriceProvider = {
+      id: "failure",
+      async getPrices() { throw new Error("provider unavailable"); },
+    };
+    const state = emptyAgentState();
+    const poller = new PricePoller(failingProvider, new OutboxRepository(state, new AgentStateRepository(new MemoryStore())), "NO2", ["webhook"]);
+    await expect(poller.poll(new Date("2026-10-07T11:30:00Z"))).rejects.toThrow("provider unavailable");
+    expect(state.outbox).toEqual([]);
+  });
+
 });
