@@ -4,7 +4,7 @@ import { loadAgentConfig } from "./config";
 describe("agent config", () => {
   it("uses safe defaults with outbound transports disabled", () => {
     expect(loadAgentConfig({})).toEqual({
-      host: "0.0.0.0",
+      host: "127.0.0.1",
       port: 8787,
       statePath: "./data/agent-state.json",
       mqttUrl: undefined,
@@ -12,6 +12,7 @@ describe("agent config", () => {
       mqttPassword: undefined,
       webhookUrl: undefined,
       workerIntervalMs: 5000,
+      apiToken: undefined,
     });
   });
 
