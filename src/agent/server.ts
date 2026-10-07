@@ -28,6 +28,16 @@ export function createAgentServer(
   dependencies: AgentServerDependencies = {},
 ): Server {
   return createServer(async (request, response) => {
+    const mutation = request.method === "POST" || request.method === "PUT" || request.method === "DELETE";
+    if (mutation && request.url?.startsWith("/api/") && config.apiToken) {
+      const authorization = request.headers.authorization;
+      if (authorization !== `Bearer ${config.apiToken}`) {
+        response.writeHead(401, { "content-type": "application/json", "www-authenticate": "Bearer" });
+        response.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+    }
+
     if (request.method === "GET" && request.url === "/healthz") {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ status: "ok" }));
