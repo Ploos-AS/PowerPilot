@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AGENT_STATE_SCHEMA, emptyAgentState } from "./agentState";
+import { AGENT_STATE_SCHEMA, assertAgentState, emptyAgentState } from "./agentState";
 import { AgentStateRepository } from "./agentStateRepository";
 import type { StateStore } from "./stateStore";
 
@@ -48,5 +48,41 @@ describe("AgentStateRepository", () => {
     );
     expect(state.schema).toBe(AGENT_STATE_SCHEMA);
     expect(state.deliveries.map(item => item.status)).toEqual(["delivered", "pending"]);
+  });
+  it("normalizes legacy v1 state without an outbox", () => {
+    const state: any = { schema: AGENT_STATE_SCHEMA, jobs: [], savings: [], deliveries: [] };
+    expect(() => assertAgentState(state)).not.toThrow();
+    expect(state.outbox).toEqual([]);
+  });
+
+  it("rejects duplicate delivery transport keys", () => {
+    const state = emptyAgentState();
+    state.deliveries.push(
+      { eventId: "event-1", transport: "webhook", status: "pending", attempts: 0, updatedAt: "2026-10-06T12:00:00.000Z" },
+      { eventId: "event-1", transport: "webhook", status: "pending", attempts: 1, updatedAt: "2026-10-06T12:01:00.000Z" },
+    );
+    expect(() => assertAgentState(state)).toThrow("Duplicate Agent delivery");
+  });
+
+  it("rejects an outbox payload whose id differs from its envelope", () => {
+    const state = emptyAgentState();
+    state.outbox.push({
+      id: "event-1", kind: "automation", createdAt: "2026-10-06T12:00:00.000Z",
+      payload: {
+        schema: "powerpilot.automation.v1", id: "event-2", area: "NO2",
+        startsAt: "2026-10-06T13:00:00.000Z", orePerKwh: 10,
+        signal: "favourable", policy: "ALLOW_LOW_PRIORITY_COMPUTE",
+      },
+    });
+    expect(() => assertAgentState(state)).toThrow("Invalid Agent outbox event");
+  });
+
+  it("rejects malformed retry timestamps", () => {
+    const state = emptyAgentState();
+    state.deliveries.push({
+      eventId: "event-1", transport: "mqtt", status: "pending", attempts: 1,
+      updatedAt: "2026-10-06T12:00:00.000Z", nextAttemptAt: "not-a-date",
+    });
+    expect(() => assertAgentState(state)).toThrow("Invalid Agent delivery");
   });
 });
