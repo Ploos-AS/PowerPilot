@@ -33,7 +33,8 @@ export const hvaKosterStrommenProvider: PriceProvider = {
     }
     const rows = (await response.json()) as HksPrice[];
     return rows.map((row) => ({
-      startsAt: row.time_start,\n      endsAt: row.time_end,
+      startsAt: row.time_start,
+      endsAt: row.time_end,
       area,
       orePerKwh: Math.round(row.NOK_per_kWh * 1_000_000) / 10_000,
     }));
