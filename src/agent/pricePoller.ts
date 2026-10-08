@@ -24,7 +24,11 @@ export class PricePoller {
     const prices = await this.provider.getPrices(this.area, providerDate);
     const nowMs = now.getTime();
     const current = [...prices]
-      .filter(price => {\n        const start = Date.parse(price.startsAt);\n        const end = price.endsAt ? Date.parse(price.endsAt) : start + 60 * 60 * 1000;\n        return Number.isFinite(start) && Number.isFinite(end) && start <= nowMs && nowMs < end && end > start;\n      })
+      .filter(price => {
+        const start = Date.parse(price.startsAt);
+        const end = price.endsAt ? Date.parse(price.endsAt) : start + 60 * 60 * 1000;
+        return Number.isFinite(start) && Number.isFinite(end) && start <= nowMs && nowMs < end && end > start;
+      })
       .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt))[0];
     if (!current) return 0;
 
